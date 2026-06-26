@@ -1,15 +1,16 @@
 /* NOTE - this is a demonstration, writing a "real" roboust system which
 	Also implements tensoric product is quite hard so its avoided */
 
-/* Simplifier */
+ /* Simplifier */
+
 /**************************************************/
+
 % This simplifier is intentionally made to be simple over complete 
 % It also INTENTIONALLY avoids modern extensions like CFD and sticks to "classical prolog",
 % Hence the extensive use of cut.
 % This simplifier is directly adopted from "Clause and Effect".
 
-
-% simplify until no further simplifications are possible
+% Simplify until no further simplifications are possible
 simp(X, Y) :-
 	s_step(X, Next),
 	X \== Next, !,
@@ -17,81 +18,99 @@ simp(X, Y) :-
 
 simp(X, X).
 
-% simplify Matrix Form
+
+% Simplify Matrix Form
 simpmat([], []).
-simpmat([[H|T]|Z], [R|S]) 	:- !, simpmat([H|T], R), simpmat(Z, S).
-simpmat([H|T], [R|S]) 		:- simp(H,R), simpmat(T, S).
+simpmat([[H|T]|Z], [R|S])	:- !, simpmat([H|T], R), simpmat(Z, S).
+simpmat([H|T], [R|S])		:- simp(H,R), simpmat(T, S).
 
-% infix step
-s_step(A+B, R) 		:- !, s_step(A, A1), s_step(B, B1), reduc(A1+B1, R).
-s_step(A*B, R) 		:- !, s_step(A, A1), s_step(B, B1), reduc(A1*B1, R).
-s_step(A-B, R) 		:- !, s_step(A, A1), s_step(B, B1), reduc(A1-B1, R).
-s_step(A/B, R) 		:- !, s_step(A, A1), s_step(B, B1), reduc(A1/B1, R).
+% Simplification step, to preform reduction
 
-s_step(conj(A+B), R) :- !, s_step(conj(A), A1), s_step(conj(B), B1), reduc(A1+B1, R).
-s_step(conj(A*B), R) :- !, s_step(conj(A), A1), s_step(conj(B), B1), reduc(A1*B1, R).
-s_step(conj(-A), R)  :- !, s_step(conj(A), A1), reduc(-A1, R).
+s_step(Term, X) :-
+	compound(Term), !,
+	Term =.. [F | Args], 					% seperate functor from args
+	maplist(s_step, Args, Mapped_args), 	% simplify args
+	New_term =.. [F | Mapped_args],	  		% recombine
+	reduc(New_term, X).				 		% reduce the functor
 
-% function step
-s_step(sqrt(A), R) 	:- !, s_step(A, A1), reduc(sqrt(A1), R).
-s_step(conj(A), R) 	:- !, s_step(A, A1), reduc(conj(A1), R).
-s_step(mag(A), R) 	:- !, s_step(A, A1), reduc(mag(A1), R).
-
-% compund step
-s_step(conj(conj(A)), R) :- !, s_step(A, A1), reduc(conj(conj(A1)), R).
-
-% the unity step
 s_step(X, X).
 
-% reduction form
-reduc(A+B, C) 	:- number(A), number(B), !, C is A + B.
-reduc(0+A, A) 	:- !.
-reduc(A+0, A) 	:- !.
+% Reduction rules
 
-reduc(A*B, C) 	:- number(A), number(B), !, C is A*B.
-reduc(A*1, A) 	:- !.
-reduc(1*A, A) 	:- !.
-reduc(_*0, 0) 	:- !.
-reduc(0*_, 0) 	:- !.
-
-reduc(A-0, A) 	:- !.
-reduc(A-A, 0) 	:- !.
-
-reduc(A/B, C) 	:- number(A), number(B), !, C is A/B.
-reduc(A/1, A) 	:- !.
-reduc(_/0, inf) :- !. % This situation shouldn't occur and will is designed to give an undefined answer like 'inf'
-reduc(_/inf, 0) :- !.
+% Notation reduction - refactor prolog's representation
+reduc(A * -B, -(A * B)).
+reduc(-A * B, -(A * B)).
+reduc(A + -B, A - B).
+reduc(A - -B, A + B).
+reduc(-1 * A, -A).
+reduc(A * -1, -A).
+reduc(-(A), B) 		:- number(A), B is -1*A.
+reduc(-(A*B), C*B) 	:- number(A), C is -1*A.
 
 
-% explicit reductions
-reduc(i*i, -1) 				:- !.
-reduc(sqrt(A), B) 			:- number(A), A >= 0, !, B is sqrt(A).
-reduc(sqrt(A), i*B) 		:- number(A), A <  0, !, B is sqrt(-A).
+% Associativity
+reduc((A*B)*C, A*(B*C)). % associativity
 
-reduc(conj(A+B), CA+CB) :- !, simp(conj(A), CA), simp(conj(B), CB).
-reduc(conj(A*B), CA*CB) :- !, simp(conj(A), CA), simp(conj(B), CB).
-reduc(conj(-A), -CA)    :- !, simp(conj(A), CA).
+% Imaginery
+reduc(i*i, -1).
+reduc(i*A, A*i)     :- A \== i, !.
+reduc(-i*A, -A*i).
 
-% radical and complex reductions
-reduc(sqrt(A*A), A) 		:- !.
-reduc(sqrt(A**2), A) 		:- !.
-reduc(sqrt(A)*sqrt(A), A) 	:- !.
+% Arithmatic reduction (handles floats too).
+reduc(A+B, C)	 :- number(A), number(B), C is A+B.
+reduc(A-B, C)	 :- number(A), number(B), C is A-B.
+reduc(A*B, C)	 :- number(A), number(B), C is A*B.
+reduc(A/B, C)	 :- number(A), number(B), C is A/B.
 
-reduc(sqrt(A)*sqrt(B), sqrt(A*B)) :- !.
+reduc(A*i+B*i, C*i)	 :- number(A), number(B), C is A+B.
+reduc(A*i-B*i, C*i)	 :- number(A), number(B), C is A-B.
+ 
+reduc(A+B, A) 	:- number(B), B =:= 0.
+reduc(B+A, A) 	:- number(B), B =:= 0.
+reduc(A-B, A) 	:- number(B), B =:= 0.
+reduc(B-A, -A) 	:- number(B), B =:= 0.
 
-reduc(conj(conj(A)), A) :- !.
-reduc(conj(i), -i) 		:- !.
-reduc(conj(i*A), -i*A) 	:- !.
-reduc(conj(-i*A), i*A) 	:- !.
-reduc(conj(A), A) 		:- number(A), !.
-reduc(conj(-A), -A) 	:- number(A), !.
+reduc(A*B, A)	:- number(B), B =:= 1.
+reduc(B*A, A) 	:- number(B), B =:= 1.
+reduc(_*B, 0)	:- number(B), B =:= 0.
+reduc(B*_, 0)	:- number(B), B =:= 0.
 
-reduc(mag(A), A) 	:- number(A), A >= 0, !.
-reduc(mag(A), -A) 	:- number(A), A < 0,  !.
+reduc(A/B, A) 	:- number(B), B =:= 1.
+reduc(_/B, inf) :- number(B), B =:= 0. % this shouldnt happen at all
+reduc(_/inf, 0).
 
-% no reduction
+% Explicit reductions
+reduc(sqrt(A), B)	 	:- number(A), A >= 0, B is sqrt(A).
+reduc(sqrt(A), i*B)  	:- number(A), A <  0, B is sqrt(-A).
+
+reduc(conj(A+B), CA+CB) :- simp(conj(A), CA), simp(conj(B), CB).
+reduc(conj(A*B), CA*CB) :- simp(conj(A), CA), simp(conj(B), CB).
+reduc(conj(A-B), CA-CB) :- simp(conj(A), CA), simp(conj(B), CB).
+reduc(conj(A/B), CA/CB) :- simp(conj(A), CA), simp(conj(B), CB).
+
+% Radical and Complex reductions
+reduc(sqrt(A*A), A).
+reduc(sqrt(A**2), A).
+reduc(sqrt(A)*sqrt(A), A).
+reduc(sqrt(A)*sqrt(B), sqrt(A*B)).
+
+reduc(conj(conj(A)), A).
+reduc(conj(i), -i).
+reduc(conj(-i), i).
+reduc(conj(A), A)	 	:- number(A).
+
+reduc(mag(A), A)	 	:- number(A), A >= 0.
+reduc(mag(A), B)	 	:- number(A), A < 0, B is A * -1.
+reduc(mag(B*i), R) 		:- number(B), reduc(mag(B), R).
+reduc(mag(-B*i), R) 	:- number(B), reduc(mag(B), R).
+
+reduc(mag(A + B*i), sqrt(R)) :- number(A), number(B), simp(A*A + B*B, R).
+reduc(mag(B*i + A), sqrt(R)) :- number(A), number(B), simp(A*A + B*B, R).
+reduc(mag(A - B*i), sqrt(R)) :- number(A), number(B), simp(A*A + B*B, R).
+reduc(mag(B*i - A), sqrt(R)) :- number(A), number(B), simp(A*A + B*B, R).
+
+% No reduction
 reduc(X, X).
-
 
 /* Matrix Multiplication and Transpose */
 /**************************************************/
@@ -130,11 +149,11 @@ compose([H|T], Result) :- h_compose(T, H, Result).
 
 % Helpers
 
-h_compose([], Acc, Acc).
+h_compose([], ACC, ACC).
 
-h_compose([H|T], Acc, Result) :-
-	mtx_mul(Acc, H, NextAcc),
-	h_compose(T, NextAcc, Result).
+h_compose([H|T], ACC, Result) :-
+	mtx_mul(ACC, H, Next_ACC),
+	h_compose(T, Next_ACC, Result).
 
 vec_to_covariant(V, Result) :- h_conjlist(V, R), Result = [R].
 
@@ -214,7 +233,7 @@ ketbra(Phi, O, Psi, Result) :-
 % 2x2 matrices
 operator(hadamard, [[1/sqrt(2), 1/sqrt(2)], [1/sqrt(2), -1/sqrt(2)]]).
 operator(sig_x,    [[0, 1],  [1, 0]]).
-operator(sig_y,    [[0, -i], [i, 0]]).
+operator(sig_y,    [[0, i], [-i, 0]]).
 operator(sig_z,    [[1, 0],  [0, -1]]).
 
 % 4x4 matrices
@@ -272,11 +291,12 @@ deutsch(Oracle, 'Extend the simplifier') :-
     \+ number(B).
 
 deutsch(Oracle, constant) :-
-    h_deutsch(Oracle, _, B, _, _),
-    B =\= 0.
+	h_deutsch(Oracle, _, B, _, _),
+	B =\= 0.
 
 deutsch(Oracle, balanced) :-
-    h_deutsch(Oracle, _, B, _, _),
-    B =:= 0.
+	h_deutsch(Oracle, _, B, _, _),
+	B =:= 0.
 
-% Now run deutsch(X, Y). and see what happens.
+% Now query deutsch(X, Y). and see what happens.
+% Also try query braket('0', [X, Y], '1', C).
