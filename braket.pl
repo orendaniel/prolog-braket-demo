@@ -44,6 +44,7 @@ reduc(A + -B, A - B).
 reduc(A - -B, A + B).
 reduc(-1 * A, -A).
 reduc(A * -1, -A).
+reduc(- -A, A).
 reduc(-(A), B) 		:- number(A), B is -1*A.
 reduc(-(A*B), C*B) 	:- number(A), C is -1*A.
 
@@ -53,8 +54,7 @@ reduc((A*B)*C, A*(B*C)). % associativity
 
 % Imaginery
 reduc(i*i, -1).
-reduc(i*A, A*i)     :- A \== i, !.
-reduc(-i*A, -A*i).
+reduc(i*A, A*i) :- A \== i, !.
 
 % Arithmatic reduction (handles floats too).
 reduc(A+B, C)	 :- number(A), number(B), C is A+B.
