@@ -285,10 +285,6 @@ h_deutsch(Oracle, A, B, C, D) :-
 	ket([hh, Oracle, hh], '01', [[A_ns],[B_ns],[C_ns],[D_ns]]),
 	simp(A_ns, A), simp(B_ns, B), simp(C_ns, C), simp(D_ns, D).
 
-deutsch(Oracle, 'Extend the simplifier') :-
-    h_deutsch(Oracle, _, B, _, _),
-    \+ number(B).
-
 deutsch(Oracle, constant) :-
 	h_deutsch(Oracle, _, B, _, _),
 	B =\= 0.
