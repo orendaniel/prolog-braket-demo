@@ -6,8 +6,7 @@
 /**************************************************/
 
 % This simplifier is intentionally made to be simple over complete 
-% It also INTENTIONALLY avoids modern extensions like CFD and sticks to "classical prolog",
-% Hence the extensive use of cut.
+% It also INTENTIONALLY avoids modern extensions like CFD and sticks to "classical prolog".
 % This simplifier is directly adopted from "Clause and Effect".
 
 % Simplify until no further simplifications are possible
@@ -54,7 +53,7 @@ reduc((A*B)*C, A*(B*C)). % associativity
 
 % Imaginery
 reduc(i*i, -1).
-reduc(i*A, A*i) :- A \== i, !.
+reduc(i*A, A*i) :- A \== i.
 
 % Arithmatic reduction (handles floats too).
 reduc(A+B, C)	 :- number(A), number(B), C is A+B.
